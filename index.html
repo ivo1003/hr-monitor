@@ -83,7 +83,7 @@
 </head>
 <body>
 <main>
-  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor <span class="muted" style="font-weight:400">v1.3</span></h1>
+  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor <span class="muted" style="font-weight:400">v1.4</span></h1>
 
   <div class="card">
     <div class="row">
@@ -448,17 +448,20 @@ async function connect() {
 let batteryTimer = null;
 async function readBattery(server) {
   clearInterval(batteryTimer);
-  $('battery').textContent = '…'; $('batteryWrap').hidden = false; $('batteryMsg').hidden = true;
+  $('battery').textContent = '…'; $('batteryWrap').hidden = false;
+  $('batteryMsg').hidden = false; $('batteryMsg').textContent = 'Strap battery: checking…';
+  const timeout = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what + ' – no answer from the strap after ' + ms / 1000 + ' s')), ms))]);
   try {
-    const svc = await server.getPrimaryService('battery_service');
-    const ch = await svc.getCharacteristic('battery_level');
+    const svc = await timeout(server.getPrimaryService('battery_service'), 8000, 'Battery service');
+    const ch = await timeout(svc.getCharacteristic('battery_level'), 5000, 'Battery level');
     const show = v => {
       const pct = v.getUint8(0);
       $('battery').textContent = pct + ' %';
       $('battery').className = pct <= 15 ? 'warn' : '';
       $('batteryWrap').title = pct <= 15 ? 'Battery low – replace the strap battery soon' : 'Strap battery';
+      $('batteryMsg').innerHTML = `<b>Strap battery: ${pct} %</b>` + (pct <= 15 ? ' <span class="warn">– low, replace the battery soon (CR2032)</span>' : '');
     };
-    show(await ch.readValue());
+    show(await timeout(ch.readValue(), 5000, 'Battery read'));
     try { ch.addEventListener('characteristicvaluechanged', e => show(e.target.value)); await ch.startNotifications(); } catch {}
     batteryTimer = setInterval(async () => { try { if (isConnected()) show(await ch.readValue()); } catch {} }, 10 * 60000);
     $('batteryWrap').hidden = false;
@@ -466,7 +469,9 @@ async function readBattery(server) {
     $('battery').textContent = 'n/a';
     $('batteryWrap').title = 'This sensor does not report its battery level';
     $('batteryWrap').hidden = false;
-    $('batteryMsg').textContent = `Battery level not available: ${e.name}: ${e.message}`;
+    let services = '';
+    try { services = (await server.getPrimaryServices()).map(s => s.uuid.slice(4, 8)).join(', '); } catch {}
+    $('batteryMsg').textContent = `Strap battery: not available. ${e.name}: ${e.message}` + (services ? ` (services seen: ${services})` : '');
     $('batteryMsg').hidden = false;
   }
 }
@@ -476,7 +481,7 @@ $('disconnectBtn').onclick = () => { manualDisconnect = true; if (device && devi
 async function onDisconnected() {
   $('dot').classList.remove('on'); $('bpm').textContent = '--'; $('topBpm').textContent = '--';
   lastBpm = null;
-  clearInterval(batteryTimer); $('batteryWrap').hidden = true;
+  clearInterval(batteryTimer); $('batteryWrap').hidden = true; $('batteryMsg').hidden = true;
   if (!manualDisconnect) {
     for (let i = 1; i <= 5; i++) {
       setStatus(`Signal lost – reconnecting (${i}/5)…`);
