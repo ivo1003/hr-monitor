@@ -83,7 +83,7 @@
 </head>
 <body>
 <main>
-  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor</h1>
+  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor <span class="muted" style="font-weight:400">v1.3</span></h1>
 
   <div class="card">
     <div class="row">
@@ -93,6 +93,7 @@
       <span class="status" style="margin-left:auto"><span id="topBpm">--</span> bpm · RR <span id="topRR">--</span> ms<span id="batteryWrap" hidden> · 🔋 <span id="battery">--</span></span></span>
     </div>
     <p class="muted warn" id="btWarn" hidden style="margin-top:8px">Web Bluetooth isn't available here. Open this file in <b>Chrome</b> or <b>Edge</b> (Windows/Android/Mac) with Bluetooth on.</p>
+    <p class="muted" id="batteryMsg" hidden style="margin-top:8px"></p>
     <p class="muted warn" id="rrWarn" hidden style="margin-top:8px">The sensor isn't sending beat-to-beat (RR) data, so HRV, DFA α1, breathing and irregular-beat features won't work.</p>
   </div>
 
@@ -447,6 +448,7 @@ async function connect() {
 let batteryTimer = null;
 async function readBattery(server) {
   clearInterval(batteryTimer);
+  $('battery').textContent = '…'; $('batteryWrap').hidden = false; $('batteryMsg').hidden = true;
   try {
     const svc = await server.getPrimaryService('battery_service');
     const ch = await svc.getCharacteristic('battery_level');
@@ -460,10 +462,12 @@ async function readBattery(server) {
     try { ch.addEventListener('characteristicvaluechanged', e => show(e.target.value)); await ch.startNotifications(); } catch {}
     batteryTimer = setInterval(async () => { try { if (isConnected()) show(await ch.readValue()); } catch {} }, 10 * 60000);
     $('batteryWrap').hidden = false;
-  } catch {
+  } catch (e) {
     $('battery').textContent = 'n/a';
     $('batteryWrap').title = 'This sensor does not report its battery level';
     $('batteryWrap').hidden = false;
+    $('batteryMsg').textContent = `Battery level not available: ${e.name}: ${e.message}`;
+    $('batteryMsg').hidden = false;
   }
 }
 
