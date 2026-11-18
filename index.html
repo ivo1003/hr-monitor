@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR Monitor</title>
+<meta name="theme-color" content="#e0344b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #6b7280; --line: #e3e6ea;
+    --accent: #e0344b; --accent-soft: #fde8eb; --ok: #1f9d55; --warn: #c27c0e; --bad: #d93636; --blue: #3b82f6;
+    --z1: #9ca3af; --z2: #3b82f6; --z3: #22a35a; --z4: #e8a317; --z5: #e0344b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e8eaed; --muted: #9aa1ab; --line: #2a3038; --accent-soft: #3a1d22; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+  h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  h3 { font-size: 16px; margin: 0 0 8px; }
+  p { margin: 0 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button, select { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+           padding: 8px 13px; border-radius: 10px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tabs button { border-radius: 999px; padding: 7px 14px; }
+  .tabs button.on { background: var(--text); color: var(--card); border-color: var(--text); }
+  section[hidden] { display: none; }
+  .status { color: var(--muted); font-size: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+  .dot.on { background: var(--ok); }
+  .live { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; }
+  .bpm { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .bpm small { font-size: 18px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .heart { color: var(--accent); display: inline-block; }
+  .heart.beat { animation: beat .25s ease-out; }
+  @keyframes beat { 50% { transform: scale(1.25); } }
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .stats.four { grid-template-columns: repeat(4, 1fr); }
+  .stat { background: var(--bg); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  canvas { width: 100%; height: 200px; display: block; }
+  canvas.small { height: 160px; }
+  .zonebar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; background: var(--bg); }
+  .zonebar div { height: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 500; }
+  tr.sel td { background: var(--accent-soft); }
+  tbody tr { cursor: pointer; }
+  input[type=number], input[type=text] { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--bg); color: var(--text); width: 90px; }
+  input[type=text] { width: 220px; max-width: 100%; }
+  label { display: inline-flex; gap: 8px; align-items: center; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .warn { color: var(--warn); }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 14px; color: #fff; }
+  .badge.ok { background: var(--ok); } .badge.warn { background: var(--warn); } .badge.bad { background: var(--bad); } .badge.info { background: var(--muted); }
+  .progress { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin: 10px 0; }
+  .progress div { height: 100%; background: var(--accent); width: 0; transition: width .5s linear; }
+  .phase { font-size: 22px; font-weight: 600; margin: 6px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .note { border-left: 3px solid var(--line); padding-left: 10px; }
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  @media (max-width: 700px) {
+    .live { grid-template-columns: 1fr; }
+    .stats, .stats.four { grid-template-columns: repeat(2, 1fr); }
+    .bpm { font-size: 60px; }
+    .hide-sm { display: none; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor</h1>
+
+  <div class="card">
+    <div class="row">
+      <button class="primary" id="connectBtn">Connect sensor</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+      <span class="status"><span class="dot" id="dot"></span><span id="status">Not connected</span></span>
+      <span class="status" style="margin-left:auto"><span id="topBpm">--</span> bpm · RR <span id="topRR">--</span> ms</span>
+    </div>
+    <p class="muted warn" id="btWarn" hidden style="margin-top:8px">Web Bluetooth isn't available here. Open this file in <b>Chrome</b> or <b>Edge</b> (Windows/Android/Mac) with Bluetooth on.</p>
+    <p class="muted warn" id="rrWarn" hidden style="margin-top:8px">The sensor isn't sending beat-to-beat (RR) data, so HRV, DFA α1, breathing and irregular-beat features won't work.</p>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="workout" class="on">Workout</button>
+    <button data-tab="morning">Morning HRV</button>
+    <button data-tab="ortho">Orthostatic test</button>
+    <button data-tab="history">History</button>
+    <button data-tab="trends">Trends</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+
+  <!-- ===================== WORKOUT ===================== -->
+  <section id="tab-workout">
+    <div class="card">
+      <div class="live">
+        <div class="bpm"><span id="bpm">--</span><small>bpm</small></div>
+        <div class="stats">
+          <div class="stat"><b id="wDur">0:00</b><span>Duration</span></div>
+          <div class="stat"><b id="wAvg">--</b><span>Avg HR</span></div>
+          <div class="stat"><b id="wMax">--</b><span>Max HR</span></div>
+          <div class="stat"><b id="wKcal">--</b><span>kcal (est.)</span></div>
+          <div class="stat"><b id="wTrimp">--</b><span>Load (TRIMP)</span></div>
+          <div class="stat"><b id="wZone">--</b><span>Zone</span></div>
+          <div class="stat"><b id="wA1">--</b><span>DFA α1</span></div>
+          <div class="stat"><b id="wResp">--</b><span>Breaths/min</span></div>
+          <div class="stat"><b id="wRmssd">--</b><span>RMSSD (1 min)</span></div>
+          <div class="stat"><b id="wFlag">--</b><span>Flagged beats</span></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <input type="text" id="label" placeholder="Note (e.g. Ride, Run)">
+        <button class="primary" id="startBtn" disabled>Start recording</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <button id="skipRecBtn" hidden>Skip recovery &amp; save</button>
+        <span class="muted" id="recInfo"></span>
+      </div>
+      <p class="muted" style="margin-top:10px">After <b>Stop</b> the app measures <b>heart rate recovery</b> for 60 s – stop right after a hard effort and stand or sit still. DFA α1 needs ~2 min of clean RR data; α1 ≈ 0.75 marks your aerobic threshold, ≈ 0.5 the anaerobic threshold. Breathing rate is only reliable at rest or easy effort.</p>
+    </div>
+    <div class="card">
+      <h2 id="liveChartTitle">Live (last 5 min)</h2>
+      <canvas id="liveChart"></canvas>
+      <div class="zonebar" id="liveZonebar"></div>
+      <div class="muted" id="liveZoneLegend" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ===================== MORNING ===================== -->
+  <section id="tab-morning" hidden>
+    <div class="card">
+      <h3>Morning readiness (HRV) test</h3>
+      <p class="muted">Do it every morning right after waking up – before coffee, after the toilet if needed. Lie on your back, relax, breathe normally and don't move or talk. The first 30 s are used to settle and are not counted.</p>
+      <div class="row">
+        <label>Length <select id="mDur"><option value="2">2 min</option><option value="3" selected>3 min</option><option value="5">5 min</option></select></label>
+        <button class="primary" id="mStart">Start morning test</button>
+        <button id="mCancel" hidden>Cancel</button>
+      </div>
+      <div id="mRun" hidden>
+        <div class="phase" id="mPhase"></div>
+        <div class="progress"><div id="mProg"></div></div>
+        <div class="muted" id="mInfo"></div>
+      </div>
+    </div>
+    <div class="card" id="mResultCard" hidden>
+      <h2 id="mResultTitle">Result</h2>
+      <div id="mResult"></div>
+    </div>
+    <div class="card">
+      <h2>HRV last 30 days (ln RMSSD, shaded = your normal range)</h2>
+      <canvas id="mTrend" class="small"></canvas>
+    </div>
+  </section>
+
+  <!-- ===================== ORTHOSTATIC ===================== -->
+  <section id="tab-ortho" hidden>
+    <div class="card">
+      <h3>Orthostatic test (lie → stand)</h3>
+      <p class="muted">Lie still for 2 minutes. When you hear the beep, <b>stand up calmly</b> and stand still for another 2 minutes. A larger rise in heart rate than usual, or slower settling, can be a sign of fatigue or overreaching. Best done in the morning, a few times a week.</p>
+      <div class="row">
+        <button class="primary" id="oStart">Start orthostatic test</button>
+        <button id="oCancel" hidden>Cancel</button>
+      </div>
+      <div id="oRun" hidden>
+        <div class="phase" id="oPhase"></div>
+        <div class="progress"><div id="oProg"></div></div>
+        <div class="muted" id="oInfo"></div>
+      </div>
+    </div>
+    <div class="card" id="oResultCard" hidden>
+      <h2 id="oResultTitle">Result</h2>
+      <div id="oResult"></div>
+      <canvas id="oChart" class="small" style="margin-top:12px"></canvas>
+    </div>
+  </section>
+
+  <!-- ===================== HISTORY ===================== -->
+  <section id="tab-history" hidden>
+    <div class="card">
+      <h2>Workouts</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Note</th><th>Time</th><th>Avg</th><th>Max</th><th class="hide-sm">Load</th><th class="hide-sm">HRR</th><th></th></tr></thead>
+        <tbody id="sessions"></tbody>
+      </table>
+      <p class="muted" id="noSessions">No workouts yet.</p>
+    </div>
+    <div class="card" id="detailCard" hidden>
+      <div class="row" style="justify-content:space-between"><h2 id="detailTitle" style="margin:0"></h2><button id="exportCsvBtn">Export CSV</button></div>
+      <div class="stats" id="detailStats" style="margin:12px 0"></div>
+      <canvas id="detailChart"></canvas>
+      <div class="zonebar" id="detailZonebar"></div>
+      <div class="muted" id="detailZoneLegend" style="margin-top:6px"></div>
+      <div id="detailA1Wrap" hidden style="margin-top:16px">
+        <h2>DFA α1 vs time (dashed: 0.75 aerobic, 0.5 anaerobic)</h2>
+        <canvas id="detailA1" class="small"></canvas>
+      </div>
+      <p class="muted" id="detailNotes" style="margin-top:10px"></p>
+    </div>
+    <div class="card">
+      <h2>Tests</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Rest HR</th><th>RMSSD</th><th class="hide-sm">Breath</th><th>Result</th><th></th></tr></thead>
+        <tbody id="tests"></tbody>
+      </table>
+      <p class="muted" id="noTests">No tests yet.</p>
+      <div id="testDetail" class="note" hidden style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ===================== TRENDS ===================== -->
+  <section id="tab-trends" hidden>
+    <div class="grid2">
+      <div class="card"><h2>Morning HRV (ln RMSSD) – 90 days</h2><canvas id="tHrv" class="small"></canvas>
+        <p class="muted">Dots = daily values, line = 7-day average, shaded = your normal range (30-day mean ± 1 SD). A 7-day average sliding below the band = accumulated fatigue/stress.</p></div>
+      <div class="card"><h2>Resting heart rate – 90 days</h2><canvas id="tRhr" class="small"></canvas>
+        <p class="muted">From morning tests. A sustained rise of 5+ bpm often means fatigue, illness, poor sleep or overtraining. A slow fall over months = improving fitness.</p></div>
+      <div class="card"><h2>Weekly training load (TRIMP) – 12 weeks</h2><canvas id="tLoad" class="small"></canvas>
+        <p class="muted" id="tLoadNote">Increase weekly load gradually (roughly ≤ 10–15 % per week).</p></div>
+      <div class="card"><h2>Heart rate recovery (60 s)</h2><canvas id="tHrr" class="small"></canvas>
+        <p class="muted">Drop in bpm in the first minute after stopping. &gt; 12 normal, &gt; 25 very good. Higher over time = better fitness.</p></div>
+      <div class="card"><h2>Orthostatic rise (standing − lying HR)</h2><canvas id="tOrtho" class="small"></canvas>
+        <p class="muted">Compare with your own usual values; a rise noticeably above your normal can mean fatigue.</p></div>
+      <div class="card"><h2>Aerobic threshold estimate (DFA α1 = 0.75)</h2><canvas id="tAet" class="small"></canvas>
+        <p class="muted">Estimated from workouts that ramped gradually from easy to hard. Use it to set the top of your easy / zone 2 training.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section id="tab-settings" hidden>
+    <div class="card">
+      <h2>Profile (used for zones, load and calories)</h2>
+      <div class="settings-grid">
+        <label>Age <input type="number" id="sAge" min="10" max="100"></label>
+        <label>Sex <select id="sSex"><option value="m">Male</option><option value="f">Female</option></select></label>
+        <label>Weight (kg) <input type="number" id="sWeight" min="30" max="200"></label>
+        <label>Max HR <input type="number" id="sMax" min="120" max="230"> <button id="estMax" title="Tanaka formula 208 − 0.7 × age">Estimate</button></label>
+        <label>Resting HR <input type="number" id="sRest" min="30" max="110"></label>
+        <label><input type="checkbox" id="sRestAuto"> Use resting HR from morning tests</label>
+      </div>
+      <p class="muted" style="margin-top:10px" id="restInfo"></p>
+      <p class="muted">Zones: Z1 &lt; 60 %, Z2 60–70 %, Z3 70–80 %, Z4 80–90 %, Z5 &gt; 90 % of max HR. Max HR from a formula can be off by ±10 bpm – if you've seen a higher value in a hard effort, use that.</p>
+    </div>
+    <div class="card">
+      <h2>Data</h2>
+      <p class="muted" id="storageInfo"></p>
+      <div class="row">
+        <button id="backupBtn">Backup all (JSON)</button>
+        <button id="restoreBtn">Restore backup</button>
+        <input type="file" id="restoreFile" accept=".json" hidden>
+      </div>
+      <p class="muted" style="margin-top:10px">Data is stored only in this browser on this computer. Back up regularly.</p>
+    </div>
+    <div class="card note">
+      <p class="muted"><b>Not a medical device.</b> A chest strap measures beat timing, not an ECG, and cannot diagnose heart rhythm problems. "Flagged beats" can be strap artefacts (dry electrodes, movement) or extra beats. If you see many flagged beats repeatedly at rest, or have palpitations, dizziness, chest pain or shortness of breath, see a doctor.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ZONE_VARS = ['--z1', '--z2', '--z3', '--z4', '--z5'];
+
+// ================= math helpers =================
+const sum = a => a.reduce((x, y) => x + y, 0);
+const avg = a => a.length ? sum(a) / a.length : NaN;
+const sd = a => { const m = avg(a); return Math.sqrt(avg(a.map(v => (v - m) ** 2))); };
+const median = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const r1 = v => Math.round(v * 10) / 10;
+function linreg(xs, ys) {
+  const n = xs.length, mx = avg(xs), my = avg(ys);
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+  const slope = sxx ? sxy / sxx : 0;
+  return { slope, icpt: my - slope * mx, r2: sxx && syy ? (sxy * sxy) / (sxx * syy) : 0 };
+}
+
+// Flag RR intervals that are out of range or differ >20 % from the local median (artefacts or ectopic beats)
+function flagRR(rr) {
+  const n = rr.length, bad = new Array(n).fill(false);
+  const valid = v => v >= 270 && v <= 2000;
+  for (let i = 0; i < n; i++) {
+    if (!valid(rr[i])) { bad[i] = true; continue; }
+    const w = [];
+    for (let j = Math.max(0, i - 5); j <= Math.min(n - 1, i + 5); j++) if (j !== i && valid(rr[j])) w.push(rr[j]);
+    if (w.length < 3) continue;
+    const med = median(w);
+    if (Math.abs(rr[i] - med) / med > 0.2) bad[i] = true;
+  }
+  return bad;
+}
+
+// Time-domain HRV
+function hrv(rr) {
+  if (!rr || rr.length < 20) return null;
+  const bad = flagRR(rr), good = rr.filter((_, i) => !bad[i]);
+  let sq = 0, nd = 0, n50 = 0;
+  for (let i = 1; i < rr.length; i++) if (!bad[i] && !bad[i - 1]) {
+    const d = rr[i] - rr[i - 1]; sq += d * d; nd++; if (Math.abs(d) > 50) n50++;
+  }
+  if (nd < 10) return null;
+  const rmssd = Math.sqrt(sq / nd), meanRR = avg(good), flagged = bad.filter(Boolean).length;
+  return { rmssd, ln: Math.log(rmssd), sdnn: sd(good), pnn50: n50 / nd * 100, meanRR, hr: 60000 / meanRR,
+           n: rr.length, flagged, flaggedPct: flagged / rr.length * 100, clean: good };
+}
+
+// DFA alpha1 (short-term scaling exponent, box sizes 4–16 beats)
+function dfaA1(rr) {
+  const N = rr.length; if (N < 64) return null;
+  const m = avg(rr), y = []; let s = 0;
+  for (const v of rr) { s += v - m; y.push(s); }
+  const lx = [], ly = [];
+  for (let n = 4; n <= 16; n++) {
+    const boxes = Math.floor(N / n); let tot = 0;
+    const sx = n * (n - 1) / 2, sxx = (n - 1) * n * (2 * n - 1) / 6;
+    for (let b = 0; b < boxes; b++) {
+      let sy = 0, sxy = 0;
+      for (let k = 0; k < n; k++) { const v = y[b * n + k]; sy += v; sxy += k * v; }
+      const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx), icpt = (sy - slope * sx) / n;
+      for (let k = 0; k < n; k++) { const r = y[b * n + k] - (icpt + slope * k); tot += r * r; }
+    }
+    const F = Math.sqrt(tot / (boxes * n));
+    if (F > 0) { lx.push(Math.log(n)); ly.push(Math.log(F)); }
+  }
+  return lx.length > 5 ? linreg(lx, ly).slope : null;
+}
+
+// Breathing rate from respiratory sinus arrhythmia: dominant frequency 0.1–0.5 Hz of the RR series
+function respRate(rr) {
+  if (!rr || rr.length < 40) return null;
+  const t = []; let c = 0;
+  for (const v of rr) { c += v; t.push(c / 1000); }
+  if (t.at(-1) - t[0] < 45) return null;
+  const fs = 4, xs = []; let j = 0;
+  for (let ti = t[0]; ti <= t.at(-1); ti += 1 / fs) {
+    while (j < t.length - 2 && t[j + 1] < ti) j++;
+    const f = (ti - t[j]) / (t[j + 1] - t[j]);
+    xs.push(rr[j] + (rr[j + 1] - rr[j]) * clamp(f, 0, 1));
+  }
+  const n = xs.length, { slope, icpt } = linreg(xs.map((_, i) => i), xs);
+  const d = xs.map((v, i) => (v - (icpt + slope * i)) * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1))));
+  let best = 0, bf = 0, total = 0;
+  for (let f = 0.1; f <= 0.5001; f += 0.005) {
+    let re = 0, im = 0;
+    for (let i = 0; i < n; i++) { const a = 2 * Math.PI * f * i / fs; re += d[i] * Math.cos(a); im -= d[i] * Math.sin(a); }
+    const p = re * re + im * im; total += p;
+    if (p > best) { best = p; bf = f; }
+  }
+  if (!total || best / total < 0.04) return null;   // no clear breathing peak
+  return r1(bf * 60);
+}
+
+// ================= storage (IndexedDB, cached in memory) =================
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('hrmonitor', 1);
+      r.onupgradeneeded = () => {
+        r.result.createObjectStore('sessions', { keyPath: 'id' });
+        r.result.createObjectStore('tests', { keyPath: 'id' });
+      };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  req(store, mode, fn) {
+    if (!this.db) return Promise.resolve(store === 'all' ? [] : null);
+    return new Promise((res, rej) => {
+      const q = fn(this.db.transaction(store, mode).objectStore(store));
+      q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+    });
+  },
+  all(store) { return this.db ? this.req(store, 'readonly', s => s.getAll()) : Promise.resolve([]); },
+  put(store, v) { return this.req(store, 'readwrite', s => s.put(v)).catch(e => alert('Could not save: ' + e.message)); },
+  del(store, id) { return this.req(store, 'readwrite', s => s.delete(id)); },
+};
+let sessions = [], tests = [];
+const byNewest = (a, b) => b.start - a.start;
+async function addSession(s) { sessions = [s, ...sessions.filter(x => x.id !== s.id)].sort(byNewest); await DB.put('sessions', s); }
+async function addTest(t) { tests = [t, ...tests.filter(x => x.id !== t.id)].sort(byNewest); await DB.put('tests', t); }
+
+const SETTINGS_KEY = 'hrmonitor.settings.v1';
+let settings = { maxHr: 190, age: 40, sex: 'm', weight: 75, restHr: 60, restAuto: true };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY))); } catch {}
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }
+
+function morningTests() { return tests.filter(t => t.kind === 'morning'); }
+function restHr() {
+  if (settings.restAuto) {
+    const m = morningTests().slice(0, 7).map(t => t.rhr).filter(Boolean);
+    if (m.length) return Math.round(median(m));
+  }
+  return settings.restHr;
+}
+
+// ================= Bluetooth =================
+let device = null, characteristic = null, manualDisconnect = false;
+let lastBpm = null, lastRR = null, firstDataAt = null, rrSeen = false;
+const liveHR = [];   // {t, bpm} last 5 min
+const liveRR = [];   // {t, rr} last 5 min
+
+if (!navigator.bluetooth) { $('btWarn').hidden = false; $('connectBtn').disabled = true; }
+
+$('connectBtn').onclick = async () => {
+  try {
+    setStatus('Choosing device…');
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    manualDisconnect = false;
+    await connect();
+  } catch (e) {
+    setStatus(e.name === 'NotFoundError' ? 'No device selected' : 'Error: ' + e.message);
+  }
+};
+
+async function connect() {
+  setStatus('Connecting to ' + (device.name || 'sensor') + '…');
+  const server = await device.gatt.connect();
+  const service = await server.getPrimaryService('heart_rate');
+  characteristic = await service.getCharacteristic('heart_rate_measurement');
+  characteristic.addEventListener('characteristicvaluechanged', e => onData(parseHr(e.target.value)));
+  await characteristic.startNotifications();
+  setStatus('Connected: ' + (device.name || 'HR sensor'), true);
+  $('connectBtn').disabled = true; $('disconnectBtn').disabled = false;
+  updateButtons();
+}
+
+$('disconnectBtn').onclick = () => { manualDisconnect = true; if (device && device.gatt.connected) device.gatt.disconnect(); };
+
+async function onDisconnected() {
+  $('dot').classList.remove('on'); $('bpm').textContent = '--'; $('topBpm').textContent = '--';
+  lastBpm = null;
+  if (!manualDisconnect) {
+    for (let i = 1; i <= 5; i++) {
+      setStatus(`Signal lost – reconnecting (${i}/5)…`);
+      await new Promise(r => setTimeout(r, 2000));
+      try { await connect(); return; } catch {}
+    }
+  }
+  setStatus(manualDisconnect ? 'Disconnected' : 'Disconnected (could not reconnect)');
+  $('connectBtn').disabled = false; $('disconnectBtn').disabled = true;
+  updateButtons();
+}
+
+function isConnected() { return !!(device && device.gatt.connected); }
+function setStatus(text, on = false) { $('status').textContent = text; $('dot').classList.toggle('on', on); }
+
+// Standard BLE Heart Rate Measurement (0x2A37)
+function parseHr(dv) {
+  const flags = dv.getUint8(0), is16 = flags & 0x01;
+  let i = 1;
+  const bpm = is16 ? dv.getUint16(i, true) : dv.getUint8(i);
+  i += is16 ? 2 : 1;
+  const noContact = (flags & 0x04) && !(flags & 0x02);
+  if (flags & 0x08) i += 2;
+  const rr = [];
+  if (flags & 0x10) for (; i + 1 < dv.byteLength; i += 2) rr.push(Math.round(dv.getUint16(i, true) / 1024 * 1000));
+  return { bpm, rr, noContact };
+}
+
+function onData({ bpm, rr, noContact }) {
+  const t = Date.now();
+  if (!firstDataAt) firstDataAt = t;
+  if (rr.length) rrSeen = true;
+  $('rrWarn').hidden = rrSeen || t - firstDataAt < 15000;
+
+  if (noContact) setStatus('Connected – no skin contact (moisten the strap)', true);
+  else if ($('status').textContent.includes('no skin contact')) setStatus('Connected: ' + (device.name || 'HR sensor'), true);
+
+  const valid = bpm > 0 && !noContact;
+  lastBpm = valid ? bpm : null;
+  $('bpm').textContent = $('topBpm').textContent = valid ? bpm : '--';
+  if (rr.length) { lastRR = rr.at(-1); $('topRR').textContent = lastRR; }
+  const h = $('heartIcon'); h.classList.remove('beat'); void h.offsetWidth; h.classList.add('beat');
+  if (!valid) return;
+
+  liveHR.push({ t, bpm });
+  for (const v of rr) liveRR.push({ t, rr: v });
+  while (liveHR.length && t - liveHR[0].t > 300000) liveHR.shift();
+  while (liveRR.length && t - liveRR[0].t > 300000) liveRR.shift();
+
+  if (rec) { const s = { t: t - rec.start, bpm }; if (rr.length) s.rr = rr; rec.samples.push(s); }
+  if (recovery) recovery.samples.push({ t: t - recovery.start, bpm });
+  if (test) test.onData(t, bpm, rr);
+  if (activeTab === 'workout') drawLive();
+}
+
+// ================= sound / wake lock =================
+let ac = null, wakeLock = null;
+function initAudio() { try { ac = ac || new AudioContext(); ac.resume(); } catch {} }
+function beep(times = 1, freq = 880) {
+  try {
+    initAudio();
+    for (let i = 0; i < times; i++) {
+      const o = ac.createOscillator(), g = ac.createGain(), at = ac.currentTime + i * 0.3;
+      o.frequency.value = freq; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.25, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.2);
+      o.start(at); o.stop(at + 0.22);
+    }
+  } catch {}
+  if (navigator.vibrate) navigator.vibrate(Array(times).fill([200, 100]).flat());
+}
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+
+// ================= workout recording =================
+let rec = null, recovery = null;
+const busy = () => !!(rec || recovery || test);
+
+function updateButtons() {
+  const c = isConnected();
+  $('startBtn').disabled = !c || busy();
+  $('stopBtn').disabled = !rec;
+  $('mStart').disabled = !c || busy();
+  $('oStart').disabled = !c || busy();
+}
+
+$('startBtn').onclick = () => {
+  initAudio();
+  rec = { start: Date.now(), samples: [], a1: [], label: $('label').value.trim() };
+  $('recInfo').textContent = '● Recording';
+  keepAwake(true); updateButtons(); drawLive();
+};
+
+$('stopBtn').onclick = () => {
+  const r = rec; rec = null;
+  updateButtons();
+  if (r.samples.length < 5) { $('recInfo').textContent = 'Too short – not saved.'; keepAwake(false); return; }
+  const session = buildSession(r);
+  if (!isConnected()) return finishSession(session);
+  const last = r.samples.filter(s => s.t >= r.samples.at(-1).t - 5000).map(s => s.bpm);
+  recovery = { start: Date.now(), samples: [], session, hrStop: Math.round(avg(last)) };
+  $('skipRecBtn').hidden = false;
+  beep(1);
+  updateButtons();
+};
+
+$('skipRecBtn').onclick = () => { const s = recovery.session; recovery = null; finishSession(s); };
+
+function tickRecovery() {
+  if (!recovery) return;
+  const el = Date.now() - recovery.start;
+  $('recInfo').textContent = `Measuring recovery… stay still, ${Math.max(0, Math.ceil(60 - el / 1000))} s (from ${recovery.hrStop} bpm)`;
+  if (el >= 60000) {
+    const w = recovery.samples.filter(s => s.t >= 55000).map(s => s.bpm);
+    const s = recovery.session;
+    if (w.length) {
+      const hr60 = Math.round(avg(w));
+      s.hrr = { hrStop: recovery.hrStop, hr60, drop: recovery.hrStop - hr60 };
+    }
+    recovery = null; beep(2);
+    finishSession(s);
+  }
+}
+
+function buildSession(r) {
+  const b = r.samples.map(s => s.bpm);
+  return { id: r.start, start: r.start, label: r.label || $('label').value.trim(),
+           durationSec: Math.round(r.samples.at(-1).t / 1000),
+           avg: Math.round(avg(b)), max: Math.max(...b), min: Math.min(...b),
+           samples: r.samples, a1: r.a1, hrr: null };
+}
+
+async function finishSession(s) {
+  $('skipRecBtn').hidden = true;
+  await addSession(s);
+  $('label').value = '';
+  $('recInfo').textContent = 'Saved' + (s.hrr ? ` – recovery ${s.hrr.drop} bpm in 60 s` : '') + '. See History.';
+  selectedId = s.id;
+  keepAwake(false); updateButtons(); renderHistory(); drawLive();
+}
+
+// Metrics derived from a workout's samples (recomputed so changes in Settings apply)
+function sessionMetrics(s, light = false) {
+  const max = settings.maxHr, rest = Math.min(restHr(), max - 20);
+  const k = settings.sex === 'f' ? [0.86, 1.67] : [0.64, 1.92];
+  const sm = s.samples, zones = [0, 0, 0, 0, 0];
+  let trimp = 0, kcal = 0;
+  for (let i = 1; i < sm.length; i++) {
+    const dt = Math.min(sm[i].t - sm[i - 1].t, 5000), dtMin = dt / 60000, hr = sm[i].bpm;
+    const hrr = clamp((hr - rest) / (max - rest), 0, 1);
+    trimp += dtMin * hrr * k[0] * Math.exp(k[1] * hrr);
+    const kpm = settings.sex === 'f'
+      ? (-20.4022 + 0.4472 * hr - 0.1263 * settings.weight + 0.074 * settings.age) / 4.184
+      : (-55.0969 + 0.6309 * hr + 0.1988 * settings.weight + 0.2017 * settings.age) / 4.184;
+    kcal += Math.max(0, kpm) * dtMin;
+    zones[zoneOf(hr)] += dt / 1000;
+  }
+  const out = { trimp: Math.round(trimp), kcal: Math.round(kcal), zones };
+  if (light) return out;
+  const T = sm.at(-1).t;
+  if (T >= 20 * 60000) {
+    const h1 = sm.filter(p => p.t > 0.1 * T && p.t <= 0.5 * T).map(p => p.bpm), h2 = sm.filter(p => p.t > 0.5 * T).map(p => p.bpm);
+    out.drift = r1((avg(h2) - avg(h1)) / avg(h1) * 100);
+  }
+  const rr = sm.flatMap(p => p.rr || []);
+  if (rr.length > 50) { const bad = flagRR(rr); out.flagged = bad.filter(Boolean).length; out.flaggedPct = r1(out.flagged / rr.length * 100); }
+  out.aet = aetEstimate(s.a1 || []);
+  return out;
+}
+
+function aetEstimate(a1s) {
+  const pts = a1s.filter(p => p.a1 > 0.2 && p.a1 < 1.7 && p.hr > 0);
+  if (pts.length < 12) return null;
+  const hrs = pts.map(p => p.hr), { slope, icpt, r2 } = linreg(hrs, pts.map(p => p.a1));
+  if (slope >= 0 || r2 < 0.4) return null;
+  const lo = Math.min(...hrs) - 5, hi = Math.max(...hrs) + 5;
+  const aet = (0.75 - icpt) / slope, ant = (0.5 - icpt) / slope;
+  if (aet < lo || aet > hi) return null;
+  return { aet: Math.round(aet), ant: ant >= lo && ant <= hi ? Math.round(ant) : null, r2: Math.round(r2 * 100) / 100 };
+}
+
+function zoneOf(bpm) { const p = bpm / settings.maxHr; return p < .6 ? 0 : p < .7 ? 1 : p < .8 ? 2 : p < .9 ? 3 : 4; }
+
+function fmtDur(sec) {
+  sec = Math.round(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+}
+const fmtDate = ts => { const d = new Date(ts); return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+const dash = v => (v === null || v === undefined || Number.isNaN(v)) ? '–' : v;
+
+// live analytics (every tick)
+let tickN = 0;
+function tickLive() {
+  tickN++;
+  if (rec) {
+    $('wDur').textContent = fmtDur((Date.now() - rec.start) / 1000);
+    if (rec.samples.length > 1) {
+      const b = rec.samples.map(s => s.bpm), m = sessionMetrics(rec, true);
+      $('wAvg').textContent = Math.round(avg(b)); $('wMax').textContent = Math.max(...b);
+      $('wKcal').textContent = m.kcal; $('wTrimp').textContent = m.trimp;
+    }
+  }
+  $('wZone').textContent = lastBpm ? 'Z' + (zoneOf(lastBpm) + 1) : '--';
+  if (tickN % 5) return;
+  const now = Date.now();
+  const rr120 = liveRR.filter(p => now - p.t <= 120000).map(p => p.rr);
+  const h120 = hrv(rr120);
+  let a1 = null;
+  if (h120 && rr120.length >= 90 && h120.flaggedPct < 5) a1 = dfaA1(h120.clean);
+  $('wA1').textContent = a1 === null ? '--' : a1.toFixed(2);
+  if (rec && a1 !== null) {
+    const hr = avg(liveHR.filter(p => now - p.t <= 30000).map(p => p.bpm));
+    rec.a1.push({ t: now - rec.start, a1: Math.round(a1 * 1000) / 1000, hr: Math.round(hr) });
+  }
+  const rr60 = liveRR.filter(p => now - p.t <= 60000).map(p => p.rr), h60 = hrv(rr60);
+  $('wRmssd').textContent = h60 ? Math.round(h60.rmssd) : '--';
+  $('wResp').textContent = h60 ? dash(respRate(h60.clean)) : '--';
+  const src = rec ? rec.samples.flatMap(p => p.rr || []) : liveRR.map(p => p.rr);
+  if (src.length > 30) { const n = flagRR(src).filter(Boolean).length; $('wFlag').textContent = `${n} (${r1(n / src.length * 100)}%)`; }
+}
+
+function drawLive() {
+  if (activeTab !== 'workout') return;
+  let pts, title;
+  if (rec) { pts = rec.samples.map(p => ({ x: p.t / 1000, y: p.bpm })); title = 'Recording'; }
+  else { const t0 = liveHR.length ? liveHR[0].t : 0; pts = liveHR.map(p => ({ x: (p.t - t0) / 1000, y: p.bpm })); title = 'Live (last 5 min)'; }
+  $('liveChartTitle').textContent = title;
+  hrChart($('liveChart'), pts);
+  zoneBar($('liveZonebar'), $('liveZoneLegend'), pts);
+}
+
+// ================= Morning HRV test =================
+let test = null;
+
+$('mStart').onclick = () => {
+  initAudio();
+  const dur = +$('mDur').value * 60000, settle = 30000;
+  test = {
+    kind: 'morning', start: Date.now(), settle, dur, rr: [], hr: [],
+    onData(t, bpm, rr) { if (t - this.start >= settle) { this.hr.push(bpm); this.rr.push(...rr); } },
+    tick() {
+      const el = Date.now() - this.start, total = settle + dur;
+      $('mProg').style.width = clamp(el / total * 100, 0, 100) + '%';
+      $('mPhase').textContent = el < settle ? `Settling… ${Math.ceil((settle - el) / 1000)} s` : `Measuring… ${fmtDur((total - el) / 1000)} left`;
+      $('mInfo').textContent = `HR ${dash(lastBpm)} bpm · ${this.rr.length} beats recorded`;
+      if (el >= total) finishMorning();
+    }
+  };
+  $('mRun').hidden = false; $('mCancel').hidden = false;
+  keepAwake(true); updateButtons(); test.tick();
+};
+$('mCancel').onclick = () => cancelTest();
+$('oCancel').onclick = () => cancelTest();
+function cancelTest() {
+  test = null;
+  ['mRun', 'mCancel', 'oRun', 'oCancel'].forEach(id => $(id).hidden = true);
+  keepAwake(false); updateButtons();
+}
+
+async function finishMorning() {
+  const tt = test; cancelTest(); beep(2);
+  const h = hrv(tt.rr);
+  const t = { id: tt.start, kind: 'morning', start: tt.start, durSec: tt.dur / 1000,
+              rhr: Math.round(h ? h.hr : avg(tt.hr)) || null, rr: tt.rr };
+  if (h) Object.assign(t, { rmssd: r1(h.rmssd), ln: Math.round(h.ln * 1000) / 1000, sdnn: r1(h.sdnn), pnn50: r1(h.pnn50),
+                            flagged: h.flagged, flaggedPct: r1(h.flaggedPct), resp: respRate(h.clean) });
+  if (!t.rhr) { alert('No heart-rate data received – test not saved.'); return; }
+  await addTest(t);
+  showMorningResult(t);
+  renderHistory();
+  drawMorningTrend();
+}
+
+function readiness(t) {
+  const prior = morningTests().filter(x => x.start < t.start && x.ln).slice(0, 30);
+  if (!t.ln) return { cls: 'info', text: 'No HRV (no RR data)', detail: '' };
+  if (prior.length < 5) return { cls: 'info', text: `Building your baseline (${prior.length}/5 tests)`,
+    detail: 'Keep testing every morning – after 5 tests you get a readiness verdict.' };
+  const lns = prior.map(x => x.ln), m = avg(lns), s = Math.max(sd(lns), 0.05);
+  const rh = prior.map(x => x.rhr).filter(Boolean), mRhr = avg(rh);
+  const rhrHigh = t.rhr > mRhr + 5;
+  let r;
+  if (t.ln < m - s) r = { cls: rhrHigh ? 'bad' : 'warn', text: 'Below your normal', detail: 'HRV is lower than usual – your body is under more stress (training, illness, sleep, alcohol, life). Consider an easy day or rest.' };
+  else if (t.ln > m + s) r = { cls: 'ok', text: 'Above your normal', detail: 'HRV is higher than usual – usually a good sign. If you also feel heavy or sick, take it easy anyway.' };
+  else r = { cls: rhrHigh ? 'warn' : 'ok', text: 'Normal – train as planned', detail: 'HRV is within your usual range.' };
+  if (rhrHigh) r.detail += ` Resting HR is ${Math.round(t.rhr - mRhr)} bpm above your average – watch for fatigue or illness.`;
+  r.normal = [m - s, m + s];
+  return r;
+}
+
+function morningHtml(t) {
+  const r = readiness(t);
+  const score = t.ln ? Math.round(t.ln * 20) : '–';
+  let h = `<p><span class="badge ${r.cls}">${r.text}</span></p><p>${r.detail}</p>
+  <div class="stats" style="margin:12px 0">
+    <div class="stat"><b>${dash(t.rhr)}</b><span>Resting HR</span></div>
+    <div class="stat"><b>${dash(t.rmssd)}</b><span>RMSSD (ms)</span></div>
+    <div class="stat"><b>${score}</b><span>HRV score (ln RMSSD×20)</span></div>
+    <div class="stat"><b>${dash(t.sdnn)}</b><span>SDNN (ms)</span></div>
+    <div class="stat"><b>${dash(t.pnn50)}${t.pnn50 !== undefined ? '%' : ''}</b><span>pNN50</span></div>
+    <div class="stat"><b>${dash(t.resp)}</b><span>Breaths/min</span></div>
+    <div class="stat"><b>${t.flagged !== undefined ? `${t.flagged} (${t.flaggedPct}%)` : '–'}</b><span>Flagged beats</span></div>
+    <div class="stat"><b>${t.rr ? t.rr.length : '–'}</b><span>Beats analysed</span></div>
+  </div>`;
+  if (t.flaggedPct >= 2) h += `<p class="warn">${t.flaggedPct}% of beats were irregular or noisy. First check the strap (moisten electrodes, tighten). If it keeps happening at rest with a good strap contact, mention it to a doctor – occasional extra beats are common and usually harmless, but this app can't tell what they are.</p>`;
+  h += `<p class="muted">Compare only with your own values. Typical resting breathing is 12–20 /min.</p>`;
+  return h;
+}
+
+function showMorningResult(t) {
+  $('mResultCard').hidden = false;
+  $('mResultTitle').textContent = 'Result – ' + fmtDate(t.start);
+  $('mResult').innerHTML = morningHtml(t);
+}
+
+function normalBandFor(ts, list) {
+  const prior = list.filter(x => x.start < ts && x.ln).slice(0, 30).map(x => x.ln);
+  if (prior.length < 5) return null;
+  const m = avg(prior), s = Math.max(sd(prior), 0.05);
+  return [m - s, m + s];
+}
+
+function hrvTrendChart(canvas, days) {
+  const from = Date.now() - days * 86400000;
+  const list = morningTests().filter(t => t.ln);
+  const shown = list.filter(t => t.start >= from).sort((a, b) => a.start - b.start);
+  const dots = shown.map(t => ({ x: t.start, y: t.ln }));
+  const roll = shown.map(t => { const w = list.filter(x => x.start <= t.start && x.start > t.start - 7 * 86400000); return { x: t.start, y: avg(w.map(x => x.ln)) }; });
+  const band = list.length ? normalBandFor(Date.now() + 1, list) : null;
+  drawChart(canvas, { series: [{ pts: roll, color: css('--accent'), width: 2 }, { pts: dots, color: css('--blue'), dots: true, noLine: true }],
+    bands: band ? [{ y1: band[0], y2: band[1], color: css('--ok') }] : [], xFmt: fmtDay, minPts: 1, empty: 'Do morning tests to see your HRV trend' });
+}
+function drawMorningTrend() { if (activeTab === 'morning') hrvTrendChart($('mTrend'), 30); }
+
+// ================= Orthostatic test =================
+const LIE = 120000, STAND = 120000;
+$('oStart').onclick = () => {
+  initAudio();
+  test = {
+    kind: 'ortho', start: Date.now(), phase: 'lie', hr: [], rr: [],
+    onData(t, bpm, rr) { const el = t - this.start; this.hr.push({ t: el, bpm }); for (const v of rr) this.rr.push({ t: el, rr: v }); },
+    tick() {
+      const el = Date.now() - this.start, total = LIE + STAND;
+      if (this.phase === 'lie' && el >= LIE) { this.phase = 'stand'; beep(3, 1000); }
+      $('oProg').style.width = clamp(el / total * 100, 0, 100) + '%';
+      $('oPhase').textContent = this.phase === 'lie' ? `Lie still… stand up in ${Math.ceil((LIE - el) / 1000)} s` : `STAND – stay still, ${fmtDur((total - el) / 1000)} left`;
+      $('oInfo').textContent = `HR ${dash(lastBpm)} bpm`;
+      if (el >= total) finishOrtho();
+    }
+  };
+  $('oRun').hidden = false; $('oCancel').hidden = false;
+  keepAwake(true); updateButtons(); test.tick();
+};
+
+async function finishOrtho() {
+  const tt = test; cancelTest(); beep(2);
+  const hrIn = (a, b) => tt.hr.filter(p => p.t >= a && p.t < b).map(p => p.bpm);
+  const rrIn = (a, b) => tt.rr.filter(p => p.t >= a && p.t < b).map(p => p.rr);
+  const lie = hrIn(60000, LIE), early = hrIn(LIE, LIE + 30000), stand = hrIn(LIE + 60000, LIE + STAND);
+  if (!lie.length || !stand.length) { alert('Not enough heart-rate data – test not saved.'); return; }
+  const hL = hrv(rrIn(30000, LIE)), hS = hrv(rrIn(LIE + 60000, LIE + STAND));
+  const t = { id: tt.start, kind: 'ortho', start: tt.start,
+    lieHr: Math.round(avg(lie)), peakHr: early.length ? Math.max(...early) : null, standHr: Math.round(avg(stand)),
+    rmssdLie: hL ? r1(hL.rmssd) : null, rmssdStand: hS ? r1(hS.rmssd) : null,
+    resp: hL ? respRate(hL.clean) : null, hr: tt.hr };
+  t.rise = t.standHr - t.lieHr;
+  t.peakRise = t.peakHr ? t.peakHr - t.lieHr : null;
+  t.rhr = t.lieHr;
+  await addTest(t);
+  showOrthoResult(t);
+  renderHistory();
+}
+
+function orthoVerdict(t) {
+  const prior = tests.filter(x => x.kind === 'ortho' && x.start < t.start).slice(0, 20);
+  if (prior.length < 3) return { cls: 'info', text: `Building your baseline (${prior.length}/3 tests)`, detail: '' };
+  const mr = avg(prior.map(x => x.rise)), ml = avg(prior.map(x => x.lieHr));
+  if (t.rise > mr + 8 || t.lieHr > ml + 6) return { cls: 'warn', text: 'Higher than usual', detail: `Rise ${t.rise} bpm vs your usual ${Math.round(mr)} bpm, lying HR ${t.lieHr} vs ${Math.round(ml)}. Possible fatigue – consider an easier day.` };
+  return { cls: 'ok', text: 'Normal', detail: `Rise ${t.rise} bpm (your usual ${Math.round(mr)} bpm).` };
+}
+
+function orthoHtml(t) {
+  const v = orthoVerdict(t);
+  return `<p><span class="badge ${v.cls}">${v.text}</span></p><p>${v.detail}</p>
+  <div class="stats four" style="margin:12px 0">
+    <div class="stat"><b>${t.lieHr}</b><span>Lying HR</span></div>
+    <div class="stat"><b>${dash(t.peakHr)}</b><span>Peak after standing</span></div>
+    <div class="stat"><b>${t.standHr}</b><span>Standing HR</span></div>
+    <div class="stat"><b>+${t.rise}</b><span>Rise (stand − lie)</span></div>
+    <div class="stat"><b>${dash(t.rmssdLie)}</b><span>RMSSD lying</span></div>
+    <div class="stat"><b>${dash(t.rmssdStand)}</b><span>RMSSD standing</span></div>
+    <div class="stat"><b>${t.peakRise !== null ? '+' + t.peakRise : '–'}</b><span>Peak rise</span></div>
+    <div class="stat"><b>${dash(t.resp)}</b><span>Breaths/min (lying)</span></div>
+  </div>
+  <p class="muted">A rise of more than ~30 bpm when standing, or getting dizzy/faint, is worth mentioning to a doctor.</p>`;
+}
+
+function showOrthoResult(t) {
+  $('oResultCard').hidden = false;
+  $('oResultTitle').textContent = 'Result – ' + fmtDate(t.start);
+  $('oResult').innerHTML = orthoHtml(t);
+  if (activeTab === 'ortho') drawChart($('oChart'), { series: [{ pts: (t.hr || []).map(p => ({ x: p.t / 1000, y: p.bpm })), color: css('--accent'), width: 2 }],
+    vlines: [{ x: LIE / 1000, color: css('--muted') }], xFmt: fmtDur });
+}
+
+// ================= History =================
+let selectedId = null, selectedTest = null;
+
+function renderHistory() {
+  $('noSessions').hidden = sessions.length > 0;
+  const tb = $('sessions'); tb.innerHTML = '';
+  for (const s of sessions) {
+    const m = sessionMetrics(s, true), tr = document.createElement('tr');
+    if (s.id === selectedId) tr.className = 'sel';
+    tr.innerHTML = `<td>${fmtDate(s.start)}</td><td></td><td>${fmtDur(s.durationSec)}</td><td>${s.avg}</td><td>${s.max}</td>
+      <td class="hide-sm">${m.trimp}</td><td class="hide-sm">${s.hrr ? s.hrr.drop : '–'}</td><td><button title="Delete">✕</button></td>`;
+    tr.children[1].textContent = s.label || '';
+    tr.onclick = () => { selectedId = selectedId === s.id ? null : s.id; renderHistory(); };
+    tr.querySelector('button').onclick = async ev => {
+      ev.stopPropagation();
+      if (!confirm('Delete this workout?')) return;
+      sessions = sessions.filter(x => x.id !== s.id); await DB.del('sessions', s.id);
+      if (selectedId === s.id) selectedId = null;
+      renderHistory();
+    };
+    tb.appendChild(tr);
+  }
+  renderDetail();
+
+  $('noTests').hidden = tests.length > 0;
+  const tt = $('tests'); tt.innerHTML = '';
+  for (const t of tests) {
+    const tr = document.createElement('tr');
+    if (t.id === selectedTest) tr.className = 'sel';
+    const res = t.kind === 'morning' ? readiness(t) : orthoVerdict(t);
+    tr.innerHTML = `<td>${fmtDate(t.start)}</td><td>${t.kind === 'morning' ? 'Morning HRV' : 'Orthostatic'}</td>
+      <td>${dash(t.rhr)}</td><td>${dash(t.kind === 'morning' ? t.rmssd : t.rmssdLie)}</td><td class="hide-sm">${dash(t.resp)}</td>
+      <td><span class="badge ${res.cls}" style="font-size:12px;padding:2px 8px;white-space:nowrap">${shortVerdict(res)}</span></td><td><button title="Delete">✕</button></td>`;
+    tr.onclick = () => { selectedTest = selectedTest === t.id ? null : t.id; renderHistory(); };
+    tr.querySelector('button').onclick = async ev => {
+      ev.stopPropagation();
+      if (!confirm('Delete this test?')) return;
+      tests = tests.filter(x => x.id !== t.id); await DB.del('tests', t.id);
+      if (selectedTest === t.id) selectedTest = null;
+      renderHistory();
+    };
+    tt.appendChild(tr);
+  }
+  const st = tests.find(t => t.id === selectedTest);
+  $('testDetail').hidden = !st;
+  if (st) $('testDetail').innerHTML = st.kind === 'morning' ? morningHtml(st) : orthoHtml(st);
+  updateStorageInfo();
+}
+
+function shortVerdict(r) {
+  if (r.text.startsWith('Building')) return 'Baseline';
+  if (r.text.startsWith('No HRV')) return 'No RR';
+  return { 'Below your normal': 'Low', 'Above your normal': 'High', 'Higher than usual': 'Elevated' }[r.text] || 'Normal';
+}
+
+function renderDetail() {
+  const s = sessions.find(x => x.id === selectedId);
+  $('detailCard').hidden = !s;
+  if (!s || activeTab !== 'history') return;
+  const m = sessionMetrics(s);
+  $('detailTitle').textContent = fmtDate(s.start) + (s.label ? ' – ' + s.label : '');
+  const tile = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
+  $('detailStats').innerHTML = [
+    tile(fmtDur(s.durationSec), 'Duration'), tile(s.avg, 'Avg HR'), tile(s.max, 'Max HR'), tile(s.min, 'Min HR'),
+    tile(m.kcal, 'kcal (est.)'), tile(m.trimp, 'Load (TRIMP)'),
+    tile(s.hrr ? `${s.hrr.drop} bpm` : '–', 'HR recovery 60 s'),
+    tile(m.drift !== undefined ? (m.drift > 0 ? '+' : '') + m.drift + '%' : '–', 'Cardiac drift'),
+    tile(m.aet ? m.aet.aet : '–', 'Aerobic thr. (α1)'),
+    tile(m.flagged !== undefined ? `${m.flagged} (${m.flaggedPct}%)` : '–', 'Flagged beats'),
+  ].join('');
+  const pts = s.samples.map(p => ({ x: p.t / 1000, y: p.bpm }));
+  hrChart($('detailChart'), pts);
+  zoneBar($('detailZonebar'), $('detailZoneLegend'), pts);
+  const a1 = s.a1 || [];
+  $('detailA1Wrap').hidden = a1.length < 3;
+  if (a1.length >= 3) drawChart($('detailA1'), { series: [{ pts: a1.map(p => ({ x: p.t / 1000, y: p.a1 })), color: css('--blue'), width: 2 }],
+    hlines: [{ y: 0.75, color: css('--z3') }, { y: 0.5, color: css('--z5') }], yMin: 0.2, yMax: 1.6, xFmt: fmtDur });
+  const notes = [];
+  if (s.hrr) notes.push(`Recovery: ${s.hrr.hrStop} → ${s.hrr.hr60} bpm in 60 s (${s.hrr.drop >= 25 ? 'very good' : s.hrr.drop > 12 ? 'normal' : 'low – only meaningful right after a hard effort'}).`);
+  if (m.drift !== undefined) notes.push(`Drift ${m.drift}% between the first and second half: < 5% suggests a good aerobic base for this effort (only meaningful at a steady pace).`);
+  if (m.aet) notes.push(`Aerobic threshold ≈ ${m.aet.aet} bpm${m.aet.ant ? `, anaerobic ≈ ${m.aet.ant} bpm` : ''} (fit R² ${m.aet.r2}).`);
+  else if (a1.length) notes.push('Not enough α1 range for a threshold estimate – needs a gradual ramp from easy to hard over ~20+ min.');
+  $('detailNotes').textContent = notes.join(' ');
+}
+
+$('exportCsvBtn').onclick = () => {
+  const s = sessions.find(x => x.id === selectedId); if (!s) return;
+  const rows = ['timestamp,elapsed_s,bpm,rr_ms'];
+  for (const p of s.samples) rows.push([new Date(s.start + p.t).toISOString(), (p.t / 1000).toFixed(1), p.bpm, (p.rr || []).join(' ')].join(','));
+  download(`hr-${new Date(s.start).toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`, rows.join('\n'), 'text/csv');
+};
+
+// ================= Trends =================
+const fmtDay = ts => { const d = new Date(ts); return d.getDate() + '.' + (d.getMonth() + 1) + '.'; };
+function weekStart(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+
+function renderTrends() {
+  if (activeTab !== 'trends') return;
+  const from = Date.now() - 90 * 86400000;
+  hrvTrendChart($('tHrv'), 90);
+  const mt = morningTests().filter(t => t.start >= from && t.rhr).sort((a, b) => a.start - b.start);
+  drawChart($('tRhr'), { series: [{ pts: mt.map(t => ({ x: t.start, y: t.rhr })), color: css('--accent'), width: 2, dots: true }], xFmt: fmtDay, minPts: 1, empty: 'Do morning tests to see resting HR' });
+
+  const w0 = weekStart(Date.now()), weeks = [];
+  for (let i = 11; i >= 0; i--) weeks.push({ start: w0 - i * 7 * 86400000, load: 0 });
+  for (const s of sessions) { const w = weeks.find(x => x.start === weekStart(s.start)); if (w) w.load += sessionMetrics(s, true).trimp; }
+  drawChart($('tLoad'), { series: [{ pts: weeks.map((w, i) => ({ x: i, y: Math.round(w.load) })), color: css('--accent'), bars: true }],
+    xMin: -0.5, xMax: 11.5, yMin: 0, xFmt: i => fmtDay(weeks[Math.round(i)]?.start || 0), xTicksAt: [0, 3, 6, 9, 11], minPts: 1 });
+  const cur = weeks[11].load, prev = avg(weeks.slice(7, 11).map(w => w.load));
+  $('tLoadNote').textContent = prev > 0
+    ? `This week ${Math.round(cur)} vs 4-week average ${Math.round(prev)} (${Math.round(cur / prev * 100)}%). Ratio above ~130% = sudden jump, higher injury/illness risk.`
+    : 'Increase weekly load gradually (roughly ≤ 10–15 % per week).';
+
+  const hr = sessions.filter(s => s.hrr).sort((a, b) => a.start - b.start);
+  drawChart($('tHrr'), { series: [{ pts: hr.map(s => ({ x: s.start, y: s.hrr.drop })), color: css('--ok'), width: 2, dots: true }],
+    hlines: [{ y: 12, color: css('--warn') }], xFmt: fmtDay, minPts: 1, empty: 'Record workouts with the 60 s recovery' });
+  const ot = tests.filter(t => t.kind === 'ortho').sort((a, b) => a.start - b.start);
+  drawChart($('tOrtho'), { series: [{ pts: ot.map(t => ({ x: t.start, y: t.rise })), color: css('--blue'), width: 2, dots: true }], xFmt: fmtDay, minPts: 1, empty: 'Do orthostatic tests to see the trend' });
+  const ae = sessions.map(s => ({ s, a: aetEstimate(s.a1 || []) })).filter(x => x.a).sort((a, b) => a.s.start - b.s.start);
+  drawChart($('tAet'), { series: [{ pts: ae.map(x => ({ x: x.s.start, y: x.a.aet })), color: css('--z3'), width: 2, dots: true }], xFmt: fmtDay, minPts: 1, empty: 'No threshold estimates yet (needs ramp workouts)' });
+}
+
+// ================= Charts =================
+function niceStep(range, ticks = 4) {
+  const raw = range / ticks, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+function drawChart(c, o) {
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  if (!W) return;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const muted = css('--muted'), line = css('--line');
+  const all = o.series.flatMap(s => s.pts).filter(p => Number.isFinite(p.y));
+  if (all.length < (o.minPts || 2)) {
+    g.fillStyle = muted; g.font = '14px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(o.empty || 'Waiting for data…', W / 2, H / 2); return;
+  }
+  const L = 40, R = 10, T = 8, B = 22;
+  if (o.minStep === undefined && !o.yMin && all.every(p => Number.isInteger(p.y))) o = { ...o, minStep: 1 };
+  let xMin = o.xMin ?? Math.min(...all.map(p => p.x)), xMax = o.xMax ?? Math.max(...all.map(p => p.x));
+  if (xMax === xMin) { xMin -= 1; xMax += 1; }
+  const ys = all.map(p => p.y).concat((o.bands || []).flatMap(b => [b.y1, b.y2]));
+  let yMin = o.yMin ?? Math.min(...ys), yMax = o.yMax ?? Math.max(...ys);
+  if (yMax === yMin) { yMax += 1; yMin -= 1; }
+  const step = Math.max(niceStep(yMax - yMin), o.minStep || 0);
+  if (o.yMin === undefined) yMin = Math.floor((yMin - step * 0.3) / step) * step;
+  if (o.yMax === undefined) yMax = Math.ceil((yMax + step * 0.3) / step) * step;
+  const X = x => L + (x - xMin) / (xMax - xMin) * (W - L - R), Y = y => T + (1 - (y - yMin) / (yMax - yMin)) * (H - T - B);
+
+  for (const b of o.bands || []) { g.globalAlpha = 0.15; g.fillStyle = b.color; g.fillRect(L, Y(b.y2), W - L - R, Y(b.y1) - Y(b.y2)); g.globalAlpha = 1; }
+  g.font = '11px system-ui'; g.fillStyle = muted; g.strokeStyle = line; g.lineWidth = 1;
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  const dec = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
+  for (let y = yMin; y <= yMax + step / 1000; y += step) {
+    g.beginPath(); g.moveTo(L, Y(y)); g.lineTo(W - R, Y(y)); g.stroke();
+    g.fillText(y.toFixed(dec), L - 6, Y(y));
+  }
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  const xf = o.xFmt || (v => Math.round(v));
+  const ticks = o.xTicksAt || [0, 1, 2, 3, 4].map(i => xMin + (xMax - xMin) * i / 4);
+  for (const x of ticks) g.fillText(xf(x), clamp(X(x), L + 14, W - R - 14), H - B + 6);
+
+  g.setLineDash([4, 4]);
+  for (const h of o.hlines || []) if (h.y > yMin && h.y < yMax) { g.strokeStyle = h.color; g.beginPath(); g.moveTo(L, Y(h.y)); g.lineTo(W - R, Y(h.y)); g.stroke(); }
+  for (const v of o.vlines || []) { g.strokeStyle = v.color; g.beginPath(); g.moveTo(X(v.x), T); g.lineTo(X(v.x), H - B); g.stroke(); }
+  g.setLineDash([]);
+
+  for (const s of o.series) {
+    const pts = s.pts.filter(p => Number.isFinite(p.y));
+    g.strokeStyle = g.fillStyle = s.color;
+    if (s.bars) {
+      const bw = (W - L - R) / (xMax - xMin) * 0.65;
+      for (const p of pts) g.fillRect(X(p.x) - bw / 2, Y(p.y), bw, Y(Math.max(yMin, 0)) - Y(p.y));
+      continue;
+    }
+    if (!s.noLine && pts.length > 1) {
+      g.lineWidth = s.width || 2; g.lineJoin = 'round'; g.beginPath();
+      pts.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y)));
+      g.stroke();
+    }
+    if (s.dots || pts.length === 1) for (const p of pts) { g.beginPath(); g.arc(X(p.x), Y(p.y), 3, 0, 7); g.fill(); }
+  }
+}
+
+function hrChart(c, pts) {
+  drawChart(c, { series: [{ pts, color: css('--accent'), width: 2 }], xFmt: fmtDur,
+    hlines: [.6, .7, .8, .9].map((p, i) => ({ y: settings.maxHr * p, color: css(ZONE_VARS[i + 1]) })) });
+}
+
+function zoneBar(bar, legend, pts) {
+  const z = [0, 0, 0, 0, 0];
+  for (let i = 1; i < pts.length; i++) z[zoneOf(pts[i].y)] += Math.min(pts[i].x - pts[i - 1].x, 5);
+  const tot = sum(z);
+  bar.innerHTML = tot ? z.map((v, i) => `<div style="width:${v / tot * 100}%;background:var(${ZONE_VARS[i]})"></div>`).join('') : '';
+  legend.textContent = tot ? z.map((v, i) => `Z${i + 1} ${fmtDur(v)} (${Math.round(v / tot * 100)}%)`).join(' · ') : '';
+}
+
+// ================= Settings =================
+function loadSettingsUI() {
+  $('sAge').value = settings.age; $('sSex').value = settings.sex; $('sWeight').value = settings.weight;
+  $('sMax').value = settings.maxHr; $('sRest').value = settings.restHr; $('sRestAuto').checked = settings.restAuto;
+  const auto = settings.restAuto && morningTests().length;
+  $('restInfo').textContent = auto ? `Resting HR in use: ${restHr()} bpm (median of your last morning tests).` : `Resting HR in use: ${restHr()} bpm.`;
+}
+for (const id of ['sAge', 'sSex', 'sWeight', 'sMax', 'sRest', 'sRestAuto']) $(id).addEventListener('change', () => {
+  settings.age = clamp(+$('sAge').value || 40, 10, 100);
+  settings.sex = $('sSex').value;
+  settings.weight = clamp(+$('sWeight').value || 75, 30, 200);
+  settings.maxHr = clamp(+$('sMax').value || 190, 120, 230);
+  settings.restHr = clamp(+$('sRest').value || 60, 30, 110);
+  settings.restAuto = $('sRestAuto').checked;
+  saveSettings(); loadSettingsUI();
+});
+$('estMax').onclick = () => { $('sMax').value = Math.round(208 - 0.7 * (+$('sAge').value || 40)); $('sMax').dispatchEvent(new Event('change')); };
+
+function updateStorageInfo() {
+  const beats = sessions.reduce((a, s) => a + s.samples.length, 0);
+  $('storageInfo').textContent = `${sessions.length} workouts, ${tests.length} tests stored (${beats.toLocaleString()} heart-rate readings).` + (DB.db ? '' : ' ⚠ Storage unavailable – data will be lost on reload!');
+}
+
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('backupBtn').onclick = () => download(`hr-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ version: 2, settings, sessions, tests }), 'application/json');
+$('restoreBtn').onclick = () => $('restoreFile').click();
+$('restoreFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const inS = (Array.isArray(data) ? data : data.sessions || []).filter(s => s && s.id && Array.isArray(s.samples));
+    const inT = (data.tests || []).filter(t => t && t.id && t.kind);
+    let n = 0;
+    for (const s of inS) if (!sessions.some(x => x.id === s.id)) { await addSession(s); n++; }
+    for (const t of inT) if (!tests.some(x => x.id === t.id)) { await addTest(t); n++; }
+    alert(`Restored ${n} item(s).`);
+    renderHistory(); renderTab();
+  } catch { alert('That file is not a valid backup.'); }
+  e.target.value = '';
+};
+
+// ================= Tabs & loop =================
+let activeTab = 'workout';
+try { activeTab = localStorage.getItem('hrmonitor.tab') || 'workout'; } catch {}
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); };
+function showTab(name) {
+  activeTab = name;
+  try { localStorage.setItem('hrmonitor.tab', name); } catch {}
+  for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.tab === name);
+  for (const s of document.querySelectorAll('main > section')) s.hidden = s.id !== 'tab-' + name;
+  renderTab();
+}
+function renderTab() {
+  if (activeTab === 'workout') drawLive();
+  if (activeTab === 'morning') { drawMorningTrend(); const t = morningTests()[0]; if (t && !test) showMorningResult(t); }
+  if (activeTab === 'ortho') { const t = tests.find(x => x.kind === 'ortho'); if (t && !test) showOrthoResult(t); }
+  if (activeTab === 'history') renderDetail();
+  if (activeTab === 'trends') renderTrends();
+  if (activeTab === 'settings') loadSettingsUI();
+}
+window.addEventListener('resize', renderTab);
+window.addEventListener('beforeunload', e => { if (busy()) { e.preventDefault(); e.returnValue = ''; } });
+
+setInterval(() => {
+  tickLive(); tickRecovery();
+  if (test) test.tick();
+}, 1000);
+
+(async () => {
+  try {
+    await DB.open();
+    // migrate sessions saved by the first version of this app
+    try {
+      const old = JSON.parse(localStorage.getItem('hrmonitor.sessions.v1') || 'null');
+      if (Array.isArray(old)) { for (const s of old) await DB.put('sessions', s); localStorage.removeItem('hrmonitor.sessions.v1'); }
+    } catch {}
+    sessions = (await DB.all('sessions')).sort(byNewest);
+    tests = (await DB.all('tests')).sort(byNewest);
+  } catch (e) { console.warn('IndexedDB unavailable', e); }
+  renderHistory(); showTab(activeTab); updateButtons();
+})();
+</script>
+</body>
+</html>
