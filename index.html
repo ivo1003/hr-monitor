@@ -90,7 +90,7 @@
       <button class="primary" id="connectBtn">Connect sensor</button>
       <button id="disconnectBtn" disabled>Disconnect</button>
       <span class="status"><span class="dot" id="dot"></span><span id="status">Not connected</span></span>
-      <span class="status" style="margin-left:auto"><span id="topBpm">--</span> bpm · RR <span id="topRR">--</span> ms</span>
+      <span class="status" style="margin-left:auto"><span id="topBpm">--</span> bpm · RR <span id="topRR">--</span> ms<span id="batteryWrap" hidden> · 🔋 <span id="battery">--</span></span></span>
     </div>
     <p class="muted warn" id="btWarn" hidden style="margin-top:8px">Web Bluetooth isn't available here. Open this file in <b>Chrome</b> or <b>Edge</b> (Windows/Android/Mac) with Bluetooth on.</p>
     <p class="muted warn" id="rrWarn" hidden style="margin-top:8px">The sensor isn't sending beat-to-beat (RR) data, so HRV, DFA α1, breathing and irregular-beat features won't work.</p>
@@ -421,7 +421,7 @@ if (!navigator.bluetooth) { $('btWarn').hidden = false; $('connectBtn').disabled
 $('connectBtn').onclick = async () => {
   try {
     setStatus('Choosing device…');
-    device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }], optionalServices: ['battery_service'] });
     device.addEventListener('gattserverdisconnected', onDisconnected);
     manualDisconnect = false;
     await connect();
@@ -440,6 +440,31 @@ async function connect() {
   setStatus('Connected: ' + (device.name || 'HR sensor'), true);
   $('connectBtn').disabled = true; $('disconnectBtn').disabled = false;
   updateButtons();
+  readBattery(server);
+}
+
+// Standard BLE Battery Service (0x180F) – optional, not every strap has it
+let batteryTimer = null;
+async function readBattery(server) {
+  clearInterval(batteryTimer);
+  try {
+    const svc = await server.getPrimaryService('battery_service');
+    const ch = await svc.getCharacteristic('battery_level');
+    const show = v => {
+      const pct = v.getUint8(0);
+      $('battery').textContent = pct + ' %';
+      $('battery').className = pct <= 15 ? 'warn' : '';
+      $('batteryWrap').title = pct <= 15 ? 'Battery low – replace the strap battery soon' : 'Strap battery';
+    };
+    show(await ch.readValue());
+    try { ch.addEventListener('characteristicvaluechanged', e => show(e.target.value)); await ch.startNotifications(); } catch {}
+    batteryTimer = setInterval(async () => { try { if (isConnected()) show(await ch.readValue()); } catch {} }, 10 * 60000);
+    $('batteryWrap').hidden = false;
+  } catch {
+    $('battery').textContent = 'n/a';
+    $('batteryWrap').title = 'This sensor does not report its battery level';
+    $('batteryWrap').hidden = false;
+  }
 }
 
 $('disconnectBtn').onclick = () => { manualDisconnect = true; if (device && device.gatt.connected) device.gatt.disconnect(); };
@@ -447,6 +472,7 @@ $('disconnectBtn').onclick = () => { manualDisconnect = true; if (device && devi
 async function onDisconnected() {
   $('dot').classList.remove('on'); $('bpm').textContent = '--'; $('topBpm').textContent = '--';
   lastBpm = null;
+  clearInterval(batteryTimer); $('batteryWrap').hidden = true;
   if (!manualDisconnect) {
     for (let i = 1; i <= 5; i++) {
       setStatus(`Signal lost – reconnecting (${i}/5)…`);
