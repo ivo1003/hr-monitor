@@ -72,6 +72,23 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .note { border-left: 3px solid var(--line); padding-left: 10px; }
   .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .helpbtn { margin-left: auto; font-size: 14px; font-weight: 500; padding: 6px 12px; border-radius: 999px; }
+  .stat { cursor: help; }
+  .stat:hover { outline: 1px solid var(--line); }
+  dialog#helpDlg { width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--line);
+                   border-radius: 14px; background: var(--card); color: var(--text); }
+  dialog#helpDlg::backdrop { background: rgba(0, 0, 0, .45); }
+  .help-head { position: sticky; top: 0; background: var(--card); display: flex; justify-content: space-between; align-items: center;
+               flex-wrap: wrap; gap: 8px; padding: 14px 16px 10px; z-index: 1; border-bottom: 1px solid var(--line); }
+  #helpSearch { display: block; width: 100%; max-width: none; }
+  #helpBody { padding: 0 16px 16px; }
+  #helpBody h4 { margin: 18px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .hitem { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .hitem.hl { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .hitem b { font-size: 15px; }
+  .hitem .unit { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .hitem p { margin: 4px 0 0; font-size: 14px; }
+  .hitem .exp { background: var(--bg); border-radius: 8px; padding: 6px 8px; margin-top: 6px; font-size: 13.5px; }
   @media (max-width: 700px) {
     .live { grid-template-columns: 1fr; }
     .stats, .stats.four { grid-template-columns: repeat(2, 1fr); }
@@ -83,7 +100,17 @@
 </head>
 <body>
 <main>
-  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor <span class="muted" style="font-weight:400">v1.4</span></h1>
+  <h1><span class="heart" id="heartIcon">&#10084;</span> HR Monitor <span class="muted" style="font-weight:400">v1.5</span>
+    <button id="helpBtn" class="helpbtn" title="What do the measurements mean?">ⓘ Explain measurements</button></h1>
+
+  <dialog id="helpDlg" aria-labelledby="helpTitle">
+    <div class="help-head">
+      <h3 id="helpTitle" style="margin:0">What is measured &amp; what to expect</h3>
+      <button id="helpClose" aria-label="Close">✕</button>
+      <input type="text" id="helpSearch" placeholder="Search, e.g. RMSSD, zone, recovery">
+    </div>
+    <div id="helpBody"></div>
+  </dialog>
 
   <div class="card">
     <div class="row">
@@ -1135,6 +1162,127 @@ $('restoreFile').onchange = async e => {
   } catch { alert('That file is not a valid backup.'); }
   e.target.value = '';
 };
+
+// ================= Measurement guide =================
+// keys = tile labels (lower-case prefixes) that open this entry
+const HELP = [
+  { group: 'Basics' },
+  { id: 'hr', keys: ['bpm', 'heart rate'], title: 'Heart rate', unit: 'bpm – beats per minute',
+    what: 'How many times your heart beats per minute, measured by the chest strap.',
+    exp: 'At rest usually 50–80 bpm (lower when fit). During exercise it rises towards your max HR.' },
+  { id: 'avg', keys: ['avg hr', 'max hr', 'min hr'], title: 'Avg / Max / Min HR', unit: 'bpm',
+    what: 'Average, highest and lowest heart rate during the recording.',
+    exp: 'Easy endurance: avg in Z2 (60–70 % of max HR). Hard intervals: max close to your max HR.' },
+  { id: 'dur', keys: ['duration'], title: 'Duration', unit: 'h:mm:ss',
+    what: 'Recording time.', exp: '–' },
+  { id: 'rr', keys: ['rr', 'beats analysed'], title: 'RR interval', unit: 'ms – milliseconds',
+    what: 'The exact time between two heartbeats. 1000 ms = 60 bpm, 500 ms = 120 bpm. All HRV values are calculated from these. "Beats analysed" is how many RR intervals the test used.',
+    exp: 'It naturally changes a little from beat to beat – that is healthy. A 3-minute test at rest gives about 150–250 beats.' },
+  { id: 'zone', keys: ['zone'], title: 'Heart rate zones (Z1–Z5)', unit: '% of max HR',
+    what: 'Intensity bands based on the max HR in Settings. Z1 < 60 % very easy / recovery · Z2 60–70 % easy endurance ("can talk") · Z3 70–80 % moderate / tempo · Z4 80–90 % hard / threshold · Z5 > 90 % maximal.',
+    exp: 'Most endurance plans do ~80 % of training time in Z1–Z2 and ~20 % in Z4–Z5. The coloured bar shows your time in each zone.' },
+  { id: 'maxhr', keys: [], title: 'Max HR', unit: 'bpm',
+    what: 'The highest heart rate you can reach. Set it in Settings. The "Estimate" button uses 208 − 0.7 × age, which can be off by ±10 bpm.',
+    exp: 'If you have seen a higher value in an all-out effort, use that. Zones, load and calories depend on it.' },
+  { id: 'battery', keys: ['strap battery'], title: 'Strap battery', unit: '%',
+    what: 'Battery level reported by the chest strap.', exp: 'Replace the coin cell (usually CR2032) below ~15 %.' },
+
+  { group: 'Workout' },
+  { id: 'kcal', keys: ['kcal'], title: 'Calories', unit: 'kcal (estimate)',
+    what: 'Energy used, estimated from heart rate, age, weight and sex (Keytel formula). Only an estimate – can be off by 20 % or more.',
+    exp: 'Roughly 400–800 kcal per hour of moderate cycling or running, depending on body size and effort.' },
+  { id: 'trimp', keys: ['load', 'trimp'], title: 'Training load (TRIMP)', unit: 'points',
+    what: 'TRaining IMPulse: time × intensity, where hard minutes count much more than easy minutes. Uses your resting and max HR.',
+    exp: '1 h easy ≈ 40–70 · 1 h moderate ≈ 80–120 · 1 h hard ≈ 150+. Weekly: increase gradually; this week above ~130 % of your 4-week average is a sudden jump (higher injury / illness risk).' },
+  { id: 'hrr', keys: ['hr recovery', 'hrr'], title: 'Heart rate recovery (60 s)', unit: 'bpm drop',
+    what: 'How many beats your heart rate falls in the first 60 s after you press Stop. Measures how quickly your "rest" nervous system takes over.',
+    exp: '< 12 low · 12–25 normal · > 25 very good. Only meaningful right after a hard effort, standing or sitting still. Rising over months = better fitness.' },
+  { id: 'drift', keys: ['cardiac drift'], title: 'Cardiac drift', unit: '% change',
+    what: 'How much your average HR rose in the second half of a workout compared with the first half (workouts of 20+ min).',
+    exp: 'At a steady pace: < 5 % = good aerobic base for that effort; > 5–10 % = effort was above your aerobic level, or heat / dehydration. Ramps and intervals always show high drift – ignore it then.' },
+  { id: 'a1', keys: ['dfa', 'aerobic thr'], title: 'DFA α1 and aerobic threshold', unit: 'no unit (≈ 0.2–1.5)',
+    what: 'Detrended Fluctuation Analysis alpha1: describes the pattern of beat-to-beat changes over the last 2 minutes. It falls as intensity rises. The app estimates the heart rate where α1 = 0.75 (aerobic threshold, top of Z2) and α1 = 0.5 (anaerobic threshold).',
+    exp: 'Easy: ~1.0 or above · 0.75 = aerobic threshold · 0.5 = anaerobic threshold · below 0.5 = hard. Needs a well-fitted, moist strap. The threshold estimate needs a workout that ramps gradually from easy to hard over 20+ minutes.' },
+  { id: 'resp', keys: ['breaths'], title: 'Breathing rate', unit: 'breaths per minute',
+    what: 'Estimated from the small rhythm breathing adds to your heart rate (respiratory sinus arrhythmia).',
+    exp: 'At rest 12–20 /min is typical. A value clearly higher than your usual morning value can be a sign of illness or fatigue. Not reliable during hard exercise.' },
+  { id: 'flag', keys: ['flagged'], title: 'Flagged beats', unit: 'count (% of beats)',
+    what: 'Beats whose timing differs more than 20 % from the surrounding beats. They are either strap noise (dry electrodes, movement) or extra / skipped heartbeats. They are removed from HRV calculations.',
+    exp: 'At rest: 0–1 % normal. Occasional extra beats are common and usually harmless. If you repeatedly see > 2 % at rest with a good strap contact, or have symptoms, mention it to a doctor. This app cannot diagnose heart rhythm problems.' },
+
+  { group: 'HRV (heart rate variability)' },
+  { id: 'rmssd', keys: ['rmssd (ms)', 'rmssd (1 min)', 'rmssd'], title: 'RMSSD', unit: 'ms',
+    what: 'Root Mean Square of Successive Differences – how much each gap between beats differs from the one before. The most common HRV value; it mainly reflects your "rest and recover" (vagus) nervous system.',
+    exp: 'Very individual: about 20–100+ ms (higher when young and fit). Compare only with your own values. Higher than your normal = well recovered; lower = stress, fatigue, illness, poor sleep or alcohol.' },
+  { id: 'score', keys: ['hrv score'], title: 'HRV score', unit: 'ln(RMSSD) × 20',
+    what: 'RMSSD on a log scale, ×20. Makes day-to-day changes easier to compare.',
+    exp: 'Most people 60–90. A drop of 5+ points below your normal is meaningful.' },
+  { id: 'sdnn', keys: ['sdnn'], title: 'SDNN', unit: 'ms',
+    what: 'Standard deviation of all RR intervals – overall variability, influenced by both breathing and slower changes.',
+    exp: 'Short tests at rest: often 30–100 ms. Use the trend, like RMSSD.' },
+  { id: 'pnn50', keys: ['pnn50'], title: 'pNN50', unit: '% of beats',
+    what: 'Share of beats that differ from the previous beat by more than 50 ms.',
+    exp: 'Very individual: from a few % to 40 %+. Higher = more "rest" activity. Follows RMSSD.' },
+  { id: 'rhr', keys: ['resting hr', 'rest hr'], title: 'Resting heart rate', unit: 'bpm',
+    what: 'Average heart rate during the morning test, lying still after waking.',
+    exp: 'Typically 45–75 bpm. 5+ bpm above your usual = possible fatigue, illness, poor sleep or overtraining. A slow fall over months = better fitness.' },
+  { id: 'ready', keys: ['result'], title: 'Readiness verdict', unit: '',
+    what: 'Compares today\'s HRV with your normal range (average ± 1 standard deviation of your last 30 morning tests). Needs 5 tests before it gives a verdict.',
+    exp: 'Normal = train as planned · Below = consider an easy day or rest · Above = usually good. Several low days in a row matter more than one.' },
+
+  { group: 'Orthostatic test' },
+  { id: 'lie', keys: ['lying hr'], title: 'Lying HR', unit: 'bpm',
+    what: 'Average heart rate in the 2nd minute lying down.', exp: 'Similar to your resting HR. Higher than usual = possible fatigue.' },
+  { id: 'peak', keys: ['peak after standing', 'peak rise'], title: 'Peak after standing / Peak rise', unit: 'bpm',
+    what: 'Highest heart rate in the first 30 s after standing up, and how much that is above your lying HR.',
+    exp: 'A quick peak (+20–35 bpm) that settles within a minute is normal. A higher or slower-settling peak than usual can mean fatigue.' },
+  { id: 'stand', keys: ['standing hr'], title: 'Standing HR', unit: 'bpm',
+    what: 'Average heart rate in the last minute standing.', exp: 'Usually 10–25 bpm above lying HR.' },
+  { id: 'rise', keys: ['rise'], title: 'Rise (stand − lie)', unit: 'bpm',
+    what: 'Standing HR minus lying HR.',
+    exp: 'Typical +10 to +25 bpm. 8+ bpm above your usual rise = possible fatigue or overreaching. More than ~30 bpm, or feeling dizzy / faint, is worth mentioning to a doctor.' },
+  { id: 'rmssdpos', keys: ['rmssd lying', 'rmssd standing'], title: 'RMSSD lying / standing', unit: 'ms',
+    what: 'HRV in each position. When you stand, the "go" nervous system takes over and HRV drops.',
+    exp: 'Standing is normally much lower (often half or less) than lying. Lying RMSSD lower than your usual = less recovered.' },
+];
+
+function renderHelp(filter = '', highlight = null) {
+  const q = filter.trim().toLowerCase();
+  let html = '', group = '', pending = '';
+  for (const e of HELP) {
+    if (e.group) { group = e.group; pending = `<h4>${group}</h4>`; continue; }
+    const text = (e.title + ' ' + e.unit + ' ' + e.what + ' ' + e.exp).toLowerCase();
+    if (q && !text.includes(q)) continue;
+    html += pending; pending = '';
+    html += `<div class="hitem${e.id === highlight ? ' hl' : ''}" id="help-${e.id}">
+      <b>${e.title}</b>${e.unit ? `<span class="unit">${e.unit}</span>` : ''}
+      <p>${e.what}</p>${e.exp && e.exp !== '–' ? `<div class="exp"><b style="font-size:13px">Expected:</b> ${e.exp}</div>` : ''}</div>`;
+  }
+  $('helpBody').innerHTML = html || '<p class="muted">Nothing found.</p>';
+}
+
+function openHelp(label) {
+  let id = null;
+  if (label) {
+    const l = label.toLowerCase(); let best = 0;
+    for (const e of HELP) for (const k of e.keys || []) if (l.startsWith(k) && k.length > best) { best = k.length; id = e.id; }
+  }
+  $('helpSearch').value = '';
+  renderHelp('', id);
+  const dlg = $('helpDlg');
+  if (dlg.showModal) { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute('open', '');
+  const el = id && $('help-' + id);
+  if (el) el.scrollIntoView({ block: 'center' }); else $('helpBody').scrollTop = 0;
+}
+
+$('helpBtn').onclick = () => openHelp();
+$('helpClose').onclick = () => $('helpDlg').close ? $('helpDlg').close() : $('helpDlg').removeAttribute('open');
+$('helpSearch').oninput = e => renderHelp(e.target.value);
+$('helpDlg').addEventListener('click', e => { if (e.target === $('helpDlg')) $('helpDlg').close(); });   // tap outside closes
+document.addEventListener('click', e => {
+  const tile = e.target.closest('.stat');
+  if (tile && !$('helpDlg').contains(tile)) openHelp(tile.querySelector('span')?.textContent || '');
+});
 
 // ================= Tabs & loop =================
 let activeTab = 'workout';
