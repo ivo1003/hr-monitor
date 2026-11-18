@@ -1,0 +1,15 @@
+{
+  "name": "HR Monitor",
+  "short_name": "HR Monitor",
+  "description": "Heart rate, HRV and training load from a Bluetooth chest strap",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f7f9",
+  "theme_color": "#e0344b",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
